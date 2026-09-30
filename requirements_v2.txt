@@ -1,0 +1,13 @@
+torch>=2.5
+torchvision
+transformers>=4.45
+accelerate
+sentencepiece
+huggingface-hub
+faiss-cpu
+streamlit
+Pillow
+numpy
+pandas
+scikit-learn
+tqdm

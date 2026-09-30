@@ -1,0 +1,11 @@
+/data/
+/data_v2/
+/models/
+/.venv/
+.idea/
+__pycache__/
+*.pyc
+*.npy
+*.bin
+*.pkl
+*.safetensors
