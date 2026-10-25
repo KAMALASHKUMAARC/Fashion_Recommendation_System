@@ -6,7 +6,7 @@ from config import (
     CATEGORY_SIBLINGS,
 )
 
-
+#checks for sibling category
 def _are_siblings(c1: str, c2: str) -> bool:
     for group in CATEGORY_SIBLINGS:
         if c1 in group and c2 in group:
@@ -25,9 +25,11 @@ class HybridScoreAndRank:
         self.W_SILHOUETTE = W_SILHOUETTE
         self.W_PRICE = W_PRICE
 
+    #converting cosine similarity from [-1, 1] to [0, 1]
     def _visual_score(self, faiss_distances) -> np.ndarray:
         return np.clip((faiss_distances + 1.0) / 2.0, 0.0, 1.0)
 
+    #giving category score
     def _category_score(self, query_ranked, candidate_id) -> float:
         cand_cat = self.ms.category(candidate_id)
         if cand_cat is None:
@@ -39,30 +41,35 @@ class HybridScoreAndRank:
                 return SIBLING_SCORE
         return NO_MATCH_SCORE
 
+    #giving color score
     def _color_score(self, query_color, candidate_id) -> float:
         cand_color = self.ms.color(candidate_id)
         if cand_color is None or query_color is None:
             return 0.0
         return 1.0 if str(query_color).lower() == str(cand_color).lower() else 0.0
 
+    #giving pattern score
     def _pattern_score(self, query_pattern, candidate_id) -> float:
         cand = self.ms.pattern(candidate_id)
         if cand is None or query_pattern is None:
             return 0.0
         return 1.0 if str(query_pattern).lower() == str(cand).lower() else 0.0
 
+    #giving silhouette score
     def _silhouette_score(self, query_sil, candidate_id) -> float:
         cand = self.ms.silhouette(candidate_id)
         if cand is None or query_sil is None:
             return 0.0
         return 1.0 if str(query_sil).lower() == str(cand).lower() else 0.0
 
+    #giving price score
     def _price_score(self, query_price, candidate_id) -> float:
         cand_price = self.ms.price(candidate_id)
         if query_price is None or cand_price is None or query_price <= 0:
             return 0.0
         return float(min(query_price, cand_price) / max(query_price, cand_price))
 
+    #ranking all 100 results based on computed score in descending order
     def rank(self, query, candidate_ids, faiss_distances) -> list:
         visual_scores = self._visual_score(faiss_distances)
         results = []

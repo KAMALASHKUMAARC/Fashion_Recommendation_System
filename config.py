@@ -50,11 +50,12 @@ TOP_K_SEARCH = 500
 TOP_K_RETURN = 12
 
 # ---------- Hybrid Ranker Weights ----------
-W_VISUAL     = 0.50
+# ---------- Hybrid Ranker Weights ----------
+W_VISUAL     = 0.45
 W_CATEGORY   = 0.20
-W_COLOR      = 0.00
-W_PATTERN    = 0.10
-W_SILHOUETTE = 0.10
+W_COLOR      = 0.15
+W_PATTERN    = 0.05
+W_SILHOUETTE = 0.05
 W_PRICE      = 0.10
 
 # ---------- Category Scoring ----------

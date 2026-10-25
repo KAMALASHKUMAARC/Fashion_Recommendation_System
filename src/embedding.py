@@ -1,6 +1,6 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0" #avoids using integrated gpu
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"#memory block size 512 mb
 
 import torch
 import numpy as np
@@ -13,7 +13,7 @@ from config import (
 )
 from src.preprocess import get_transform, crop_region, load_image
 
-
+#getting actual embedding tensor from hugging face (we used 2 models)
 def _extract_tensor(output):
     if isinstance(output, torch.Tensor):
         return output
@@ -32,7 +32,7 @@ def _extract_tensor(output):
 
 class SigLIP2Encoder:
     def __init__(self, model_id: str = MODEL_ID, device: str = DEVICE):
-        if not torch.cuda.is_available():
+        if not torch.cuda.is_available():               #gpu availability check
             raise RuntimeError("CUDA not available.")
 
         self.device = torch.device("cuda:0")
@@ -77,12 +77,12 @@ class SigLIP2Encoder:
 
         print(f"[SigLIP2Encoder] Ready on {self.device}")
 
-    @torch.no_grad()
+    @torch.no_grad()        #no need to save data for back propogation
     def encode_image_full(self, img: Image.Image) -> np.ndarray:
         inputs = self.processor(images=img, return_tensors="pt")
         pixel_values = inputs.pixel_values.to(self.device).to(self.dtype)
 
-        out = self.model.get_image_features(pixel_values=pixel_values)
+        out = self.model.get_image_features(pixel_values=pixel_values)#producing embedding
         feats = _extract_tensor(out)
 
         if feats.device.type != "cuda":
@@ -94,6 +94,7 @@ class SigLIP2Encoder:
         return vec / (np.linalg.norm(vec) + 1e-8)
 
     @torch.no_grad()
+    #we use 3 cropped version for each image so we combine them here
     def encode_image_multicrop(self, img: Image.Image) -> np.ndarray:
         vecs = []
         for name, region in CROP_REGIONS.items():
@@ -114,18 +115,19 @@ class SigLIP2Encoder:
         inputs = self.processor(text=texts, return_tensors="pt", padding=True)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        out = self.model.get_text_features(**inputs)
-        feats = _extract_tensor(out)
+        out = self.model.get_text_features(**inputs)#siglip text encoder
+        feats = _extract_tensor(out)                #normalizes output format
         if feats.device.type != "cuda":
             raise RuntimeError(f"Text features on {feats.device}, expected cuda")
         if feats.dim() == 3:
             feats = feats.mean(dim=1)
 
-        vecs = feats.float().cpu().numpy()
+        vecs = feats.float().cpu().numpy()          #numpy conversion
         norms = np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-8
         return vecs / norms
 
     @torch.no_grad()
+    #using cached texts
     def encode_text_cached(self, texts: tuple) -> np.ndarray:
         if texts in self._text_cache:
             self._text_cache_stats["hits"] += 1
@@ -136,10 +138,11 @@ class SigLIP2Encoder:
         return vecs
 
     @torch.no_grad()
+    #returns confidence score for each category
     def zero_shot_classify(self, img: Image.Image, prompts: dict) -> dict:
         """SigLIP-2 zero-shot (kept for pattern/silhouette)."""
-        img_vec = self.encode_image_full(img)
-        text_vecs = self.encode_text_cached(tuple(prompts.values()))
+        img_vec = self.encode_image_full(img)       #encoding full image
+        text_vecs = self.encode_text_cached(tuple(prompts.values()))#encoding text
         sims = text_vecs @ img_vec
         sims = sims * 100.0
         probs = np.exp(sims - sims.max())
@@ -147,6 +150,7 @@ class SigLIP2Encoder:
         return {label: float(p) for label, p in zip(prompts.keys(), probs)}
 
     @torch.no_grad()
+    #we use category classification from clip model
     def category_ensemble(self, img, categories, templates=None):
         """Deprecated. Use src.clip_classifier.classify_category instead."""
         from src.clip_classifier import classify_category
@@ -174,3 +178,14 @@ class SigLIP2Encoder:
 
         ranked = sorted(zip(categories, probs), key=lambda x: -x[1])
         return {"top5": ranked[:5], "all": dict(ranked)}
+
+    @torch.no_grad()
+    def encode_text_multicrop(self, text: str) -> np.ndarray:
+        """
+        Encode text as a 3456-dim vector matching the image embedding space.
+        Triplicates the 1152-dim text embedding to match the 3-crop image embedding.
+        """
+        text_vec = self.encode_text([text])[0]   # (1152,)
+        text_vec = text_vec / (np.linalg.norm(text_vec) + 1e-8)
+        vec = np.concatenate([text_vec, text_vec, text_vec], axis=0)   # (3456,)
+        return vec / (np.linalg.norm(vec) + 1e-8)

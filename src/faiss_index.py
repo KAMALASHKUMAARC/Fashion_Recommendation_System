@@ -4,7 +4,7 @@ import pickle
 
 from config import NLIST, NPROBE, EMBEDDING_DIM
 
-
+#getting top 100 similarity to image we send
 class FAISSIndex:
     def __init__(self, dim: int = EMBEDDING_DIM):
         self.dim = dim

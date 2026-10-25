@@ -167,3 +167,47 @@ def classify_silhouette(img: Image.Image) -> str:
     probs = sims.squeeze(0).float().cpu().numpy()
 
     return SILHOUETTE_LABELS[probs.argmax()]
+
+# ---------- Text-based category ----------
+@torch.no_grad()
+def classify_category_from_text(text: str, categories: list, top_k: int = 5) -> dict:
+    """Classify a text query against category names."""
+    model, preprocess, tokenizer = _get_clip()
+
+    text_input = tokenizer([text]).cuda()
+    cat_inputs = tokenizer([f"a photo of a {c}" for c in categories]).cuda()
+
+    text_features = model.encode_text(text_input)
+    cat_features = model.encode_text(cat_inputs)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    cat_features = cat_features / cat_features.norm(dim=-1, keepdim=True)
+
+    sims = (100.0 * text_features @ cat_features.T).softmax(dim=-1)
+    probs = sims.squeeze(0).float().cpu().numpy()
+
+    ranked = sorted(zip(categories, probs), key=lambda x: -x[1])
+    return {"top5": ranked[:top_k], "all": dict(ranked)}
+
+
+# ---------- Text-based color ----------
+@torch.no_grad()
+def classify_color_from_text(text: str) -> str:
+    """Classify a text query against color names."""
+    model, preprocess, tokenizer = _get_clip()
+
+    text_input = tokenizer([text]).cuda()
+    cat_inputs = tokenizer(COLOR_PROMPTS).cuda()
+
+    text_features = model.encode_text(text_input)
+    cat_features = model.encode_text(cat_inputs)
+    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+    cat_features = cat_features / cat_features.norm(dim=-1, keepdim=True)
+
+    sims = (100.0 * text_features @ cat_features.T).softmax(dim=-1)
+    probs = sims.squeeze(0).float().cpu().numpy()
+
+    label_probs = {}
+    for label, p in zip(COLOR_LABELS, probs):
+        label_probs[label] = label_probs.get(label, 0.0) + float(p)
+
+    return max(label_probs, key=label_probs.get)

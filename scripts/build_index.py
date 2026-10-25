@@ -21,7 +21,7 @@ from src.faiss_index import FAISSIndex
 
 CHECKPOINT_EVERY = 2000
 
-
+#saves embeddings, id_map, faiss index before hand
 def main():
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(f"Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")

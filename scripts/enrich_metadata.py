@@ -14,7 +14,7 @@ from src.preprocess import load_image
 from src.embedding import SigLIP2Encoder
 from src.attributes import predict_pattern, predict_silhouette
 
-
+# will be needed to run before hand to save pattern and silhouettes for each image in dataset for faster recovery (one time)
 def main():
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(f"Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
